@@ -1,0 +1,8 @@
+<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+  <pattern id="table-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+    <rect width="20" height="20" fill="#fecaca" />
+    <path d="M0 10h20M10 0v20" stroke="#f87171" stroke-width="0.5" stroke-dasharray="2,2" />
+    <circle cx="10" cy="10" r="1" fill="#ef4444" />
+  </pattern>
+  <rect width="20" height="20" fill="url(#table-pattern)" />
+</svg> 

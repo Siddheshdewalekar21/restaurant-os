@@ -1,36 +1,132 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🍽️ RestaurantOS - Restaurant Management System
 
-## Getting Started
+RestaurantOS is a comprehensive restaurant management system designed to streamline daily operations, from order management to inventory tracking and customer engagement. Built with cutting-edge technologies, it helps restaurants operate more efficiently and deliver a seamless customer experience.
 
-First, run the development server:
+## 🚀 Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Dashboard**: Real-time analytics and restaurant performance metrics
+- **Order Management**: Track and manage orders in real-time
+- **Menu Management**: Create and update menu items and categories
+- **Table Management**: Interactive floor plan and table status tracking
+- **Customer Management**: Customer database with loyalty points
+- **Kitchen Display System**: Real-time order tickets for kitchen staff
+- **Inventory Management**: Track stock levels and get alerts for low inventory
+- **Analytics**: Detailed reports on sales, inventory, and customer behavior
+- **Multi-branch Support**: Manage multiple restaurant locations
+- **User Roles**: Role-based access control (Admin, Manager, Staff)
+- **Real-time Updates**: Socket.io integration for live updates
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 14, React 19, TypeScript, Tailwind CSS
+- **Backend**: Node.js, Next.js API Routes
+- **Database**: MySQL with Prisma ORM
+- **Authentication**: NextAuth.js
+- **Real-time**: Socket.io
+- **State Management**: React Hooks
+- **Form Handling**: React Hook Form with Zod validation
+
+## 📋 Prerequisites
+
+- Node.js 20.x or higher
+- MySQL database
+
+## 🔧 Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Siddheshdewalekar21/restaurant-os.git
+   cd restaurant-os
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   Create a `.env` file in the root directory with the following variables:
+   ```
+   DATABASE_URL="mysql://username:password@localhost:3306/restaurant_os"
+   NEXTAUTH_SECRET="your-secret-key"
+   NEXTAUTH_URL="http://localhost:3000"
+   JWT_SECRET="your-jwt-secret"
+   ```
+
+4. Set up the database:
+   ```bash
+   npx prisma db push
+   npm run seed
+   ```
+
+5. Start the development server:
+   ```bash
+   npm run dev:all
+   ```
+
+6. Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 🔑 Demo Credentials
+
+- **Admin**: admin@restaurant.com / password123
+- **Staff**: staff@restaurant.com / password123
+
+## 📁 Project Structure
+
+```
+restaurant-os/
+├── prisma/                # Database schema and migrations
+├── public/                # Static assets
+├── src/
+│   ├── app/               # Next.js App Router
+│   │   ├── api/           # API routes
+│   │   ├── auth/          # Authentication pages
+│   │   ├── dashboard/     # Dashboard pages
+│   │   ├── menu/          # Menu management
+│   │   ├── orders/        # Order management
+│   │   ├── tables/        # Table management
+│   │   ├── inventory/     # Inventory management
+│   │   ├── customers/     # Customer management
+│   │   └── settings/      # System settings
+│   ├── components/        # Reusable components
+│   ├── hooks/             # Custom React hooks
+│   ├── lib/               # Utility libraries
+│   ├── types/             # TypeScript type definitions
+│   └── utils/             # Helper functions
+├── .env                   # Environment variables
+├── next.config.js         # Next.js configuration
+└── package.json           # Project dependencies
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🧪 Testing
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Run unit tests
+npm run test
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run end-to-end tests
+npm run test:e2e
+```
 
-## Learn More
+## 🚀 Deployment
 
-To learn more about Next.js, take a look at the following resources:
+The application can be deployed to Vercel with a single command:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run deploy
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📄 License
 
-## Deploy on Vercel
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 👥 Contributors
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Your Name - Initial work
+
+## �� Acknowledgments
+
+- [Next.js](https://nextjs.org/)
+- [Prisma](https://www.prisma.io/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Socket.io](https://socket.io/)

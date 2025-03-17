@@ -1,0 +1,8 @@
+<svg width="20" height="20" xmlns="http://www.w3.org/2000/svg">
+  <pattern id="reserved-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+    <rect width="20" height="20" fill="#dbeafe" />
+    <path d="M5,5 L15,15 M15,5 L5,15" stroke="#60a5fa" stroke-width="0.5" />
+    <circle cx="10" cy="10" r="1" fill="#3b82f6" />
+  </pattern>
+  <rect width="20" height="20" fill="url(#reserved-pattern)" />
+</svg> 

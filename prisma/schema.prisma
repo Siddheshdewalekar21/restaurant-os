@@ -1,0 +1,385 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// User model for authentication and role-based access
+model User {
+  id             String    @id @default(uuid())
+  name           String
+  email          String    @unique
+  emailVerified  DateTime?
+  password       String
+  image          String?
+  role           Role      @default(STAFF)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  branch         Branch?   @relation(fields: [branchId], references: [id])
+  branchId       String?
+  accounts       Account[]
+  sessions       Session[]
+  orders         Order[]
+}
+
+// Account model for OAuth
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  STAFF
+  CUSTOMER
+}
+
+// Branch model for multi-branch support
+model Branch {
+  id          String    @id @default(uuid())
+  name        String
+  address     String
+  phoneNumber String
+  email       String?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  users       User[]
+  tables      Table[]
+  orders      Order[]
+  inventory   Inventory[]
+  location    Location?
+  reservations Reservation[]
+}
+
+// Menu category model
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  image     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  menuItems MenuItem[]
+}
+
+// Menu item model
+model MenuItem {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal   @db.Decimal(10, 2)
+  image       String?
+  isAvailable Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  category    Category  @relation(fields: [categoryId], references: [id])
+  categoryId  String
+  orderItems  OrderItem[]
+  ingredients InventoryUsage[]
+}
+
+// Table model for dine-in management
+model Table {
+  id          String   @id @default(uuid())
+  tableNumber Int
+  capacity    Int
+  status      String   @default("AVAILABLE")
+  positionX   Int      @default(0)
+  positionY   Int      @default(0)
+  shape       String   @default("CIRCLE")
+  width       Int      @default(100)
+  height      Int      @default(100)
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  orders      Order[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reservations Reservation[]
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+}
+
+// Order model
+model Order {
+  id              String    @id @default(uuid())
+  orderNumber     String    @unique
+  status          String    @default("PENDING")
+  type            String    @default("DINE_IN")
+  total           Float
+  tax             Float
+  discount        Float     @default(0)
+  grandTotal      Float
+  paymentStatus   String    @default("PENDING")
+  paymentMethod   String?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  items           OrderItem[]
+  tableId         String?
+  table           Table?    @relation(fields: [tableId], references: [id])
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id])
+  branchId        String
+  branch          Branch    @relation(fields: [branchId], references: [id])
+  customerId      String?
+  customer        Customer? @relation("CustomerOrders", fields: [customerId], references: [id])
+  payment         Payment?
+  deliveryInfo    DeliveryInfo?
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+  ONLINE
+}
+
+// Order item model
+model OrderItem {
+  id          String    @id @default(uuid())
+  quantity    Int
+  price       Decimal   @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  order       Order     @relation(fields: [orderId], references: [id])
+  orderId     String
+  menuItem    MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItemId  String
+}
+
+// Payment model
+model Payment {
+  id             String        @id @default(uuid())
+  amount         Float
+  method         String
+  status         String        @default("PENDING")
+  transactionId  String?
+  receiptUrl     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  order          Order         @relation(fields: [orderId], references: [id])
+  orderId        String        @unique
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  WALLET
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Inventory model
+model Inventory {
+  id          String    @id @default(uuid())
+  name        String
+  quantity    Decimal   @db.Decimal(10, 2)
+  unit        String
+  minLevel    Decimal   @db.Decimal(10, 2)
+  costPerUnit Decimal   @db.Decimal(10, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  branchId    String
+  usedIn      InventoryUsage[]
+}
+
+// Inventory usage model to track ingredients used in menu items
+model InventoryUsage {
+  id          String    @id @default(uuid())
+  quantity    Decimal   @db.Decimal(10, 2)
+  menuItem    MenuItem  @relation(fields: [menuItemId], references: [id])
+  menuItemId  String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  inventoryId String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([menuItemId, inventoryId])
+}
+
+// Customer model for loyalty program
+model Customer {
+  id          String    @id @default(uuid())
+  name        String
+  email       String?
+  phone       String?
+  address     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  orders      Order[]   @relation("CustomerOrders")
+  feedback    Feedback[]
+  loyaltyPoints Int     @default(0)
+}
+
+// Feedback model
+model Feedback {
+  id          String    @id @default(uuid())
+  rating      Int
+  comment     String?
+  createdAt   DateTime  @default(now())
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  customerId  String
+}
+
+// Reservation model
+model Reservation {
+  id              String   @id @default(uuid())
+  customerName    String
+  contactNumber   String
+  email           String?
+  partySize       Int
+  reservationDate String
+  reservationTime String
+  status          String   @default("PENDING")
+  tableId         String?
+  table           Table?   @relation(fields: [tableId], references: [id])
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  specialRequests String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+// Delivery Info model
+model DeliveryInfo {
+  id              String    @id @default(uuid())
+  address         String
+  city            String
+  state           String
+  zipCode         String
+  contactName     String
+  contactPhone    String
+  deliveryNotes   String?
+  status          String    @default("PENDING")
+  estimatedTime   DateTime?
+  actualTime      DateTime?
+  driverId        String?
+  driverName      String?
+  driverPhone     String?
+  orderId         String    @unique
+  order           Order     @relation(fields: [orderId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// Location model for branches and delivery tracking
+model Location {
+  id        String    @id @default(uuid())
+  latitude  Decimal
+  longitude Decimal
+  address   String?
+  branchId  String?   @unique
+  branch    Branch?   @relation(fields: [branchId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Integration model for third-party services
+model Integration {
+  id          String    @id @default(uuid())
+  name        String    // Swiggy, Zomato, Google Maps, WhatsApp
+  type        IntegrationType
+  status      IntegrationStatus @default(INACTIVE)
+  apiKey      String?
+  secretKey   String?
+  merchantId  String?
+  webhookUrl  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  webhooks    Webhook[]
+}
+
+// Webhook model for integration callbacks
+model Webhook {
+  id            String    @id @default(uuid())
+  event         String    // order.created, order.updated, etc.
+  payload       String    @db.Text
+  status        WebhookStatus @default(PENDING)
+  processedAt   DateTime?
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id])
+  createdAt     DateTime  @default(now())
+}
+
+// Enums
+enum IntegrationType {
+  DELIVERY
+  MAPS
+  MESSAGING
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
