@@ -6,6 +6,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { Customer, Order, Feedback } from '@/types';
 import QRCodeGenerator from '@/components/QRCodeGenerator';
+import React from 'react';
 
 interface CustomerWithDetails extends Customer {
   orders: Order[];
@@ -15,6 +16,8 @@ interface CustomerWithDetails extends Customer {
 }
 
 export default function CustomerDetailsPage({ params }: { params: { id: string } }) {
+  // Unwrap params using React.use()
+  const { id } = React.use(params);
   const router = useRouter();
   const [customer, setCustomer] = useState<CustomerWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,29 +35,38 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const fetchCustomer = async () => {
+    const fetchCustomerData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/customers/${params.id}`);
-        setCustomer(response.data.data);
+        const customerResponse = await axios.get(`/api/customers/${id}`);
+        const customerData = customerResponse.data.data || customerResponse.data;
+        setCustomer(customerData);
+
+        // Fetch customer orders
+        const ordersResponse = await axios.get(`/api/customers/${id}/orders`);
+        const ordersData = ordersResponse.data.data || ordersResponse.data;
+        setCustomer({
+          ...customerData,
+          orders: ordersData,
+        });
         
         // Initialize form state
-        setName(response.data.data.name);
-        setEmail(response.data.data.email || '');
-        setPhone(response.data.data.phone || '');
-        setAddress(response.data.data.address || '');
+        setName(customerData.name);
+        setEmail(customerData.email || '');
+        setPhone(customerData.phone || '');
+        setAddress(customerData.address || '');
         
         setError('');
       } catch (error: any) {
-        console.error('Error fetching customer:', error);
-        setError(error.response?.data?.error || 'Failed to load customer details. Please try again.');
+        console.error('Error fetching customer data:', error);
+        setError(error.response?.data?.error || 'Failed to fetch customer data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCustomer();
-  }, [params.id]);
+    fetchCustomerData();
+  }, [id]);
 
   const handleUpdateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +75,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
       setSubmitting(true);
       setFormError('');
       
-      const response = await axios.patch(`/api/customers/${params.id}`, {
+      const response = await axios.patch(`/api/customers/${id}`, {
         name,
         email: email || undefined,
         phone: phone || undefined,
@@ -91,7 +103,7 @@ export default function CustomerDetailsPage({ params }: { params: { id: string }
   const handleDeleteCustomer = async () => {
     try {
       setSubmitting(true);
-      await axios.delete(`/api/customers/${params.id}`);
+      await axios.delete(`/api/customers/${id}`);
       router.push('/dashboard/customers');
     } catch (error: any) {
       console.error('Error deleting customer:', error);

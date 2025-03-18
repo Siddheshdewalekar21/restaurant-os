@@ -39,13 +39,13 @@ export default function MenuPage() {
         setLoading(true);
         
         // Fetch categories
-        const categoriesResponse = await api.get('/api/categories');
-        setCategories(categoriesResponse);
+        const categoriesResponse = await api.get('/categories');
+        setCategories(categoriesResponse.data || []);
         
         // Fetch menu items
-        const menuItemsResponse = await api.get('/api/menu-items');
+        const menuItemsResponse = await api.get('/menu-items');
         console.log('Fetched menu items:', menuItemsResponse);
-        setMenuItems(menuItemsResponse);
+        setMenuItems(menuItemsResponse.data || []);
         
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -61,13 +61,13 @@ export default function MenuPage() {
   const handleSearch = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/menu-items?search=${searchQuery}`);
-      setMenuItems(response);
+      const response = await api.get(`/menu-items?search=${searchQuery}`);
+      setMenuItems(response.data || []);
       setError('');
     } catch (error: any) {
-      console.error('Error searching customers:', error);
-      setError(error.message || 'Failed to search customers. Please try again.');
-      toast.error('Failed to search customers');
+      console.error('Error searching menu items:', error);
+      setError(error.message || 'Failed to search menu items. Please try again.');
+      toast.error('Failed to search menu items');
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function MenuPage() {
       if (!item) return;
       
       // Update item in the database
-      await api.patch(`/api/menu-items/${id}`, {
+      await api.patch(`/menu-items/${id}`, {
         isAvailable: !item.isAvailable
       });
       

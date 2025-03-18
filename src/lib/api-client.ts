@@ -2,7 +2,7 @@ import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import { retryNetworkErrors } from './retry';
 
 // Get the API base URL from environment or use a default
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 // Create an axios instance with default config
 const apiClient = axios.create({
@@ -18,6 +18,11 @@ function normalizeUrl(url: string): string {
   // If URL already starts with http:// or https://, return as is
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
+  }
+  
+  // Remove leading /api if present
+  if (url.startsWith('/api/')) {
+    url = url.substring(4);
   }
   
   // If URL already starts with /, return as is
@@ -128,7 +133,7 @@ export async function apiRequest<T = any>(
       if ('success' in response.data) {
         if (response.data.success === true) {
           // Return the data property if it exists, otherwise return the whole response
-          return response.data.data !== undefined ? response.data.data : response.data;
+          return response.data;
         } else {
           // If success is false, throw an error with the error message
           throw new ApiError(

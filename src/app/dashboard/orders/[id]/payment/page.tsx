@@ -4,10 +4,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import React from 'react';
 import PaymentProcessor from '@/components/PaymentProcessor';
 import { Order } from '@/types';
 
 export default function OrderPaymentPage({ params }: { params: { id: string } }) {
+  // Unwrap params using React.use()
+  const { id } = React.use(params);
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -17,11 +20,11 @@ export default function OrderPaymentPage({ params }: { params: { id: string } })
     const fetchOrder = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/orders/${params.id}`);
+        const response = await axios.get(`/api/orders/${id}`);
         
         // Check if order already has a payment
         if (response.data.data.payment) {
-          router.push(`/dashboard/orders/${params.id}`);
+          router.push(`/dashboard/orders/${id}`);
           return;
         }
         
@@ -36,15 +39,15 @@ export default function OrderPaymentPage({ params }: { params: { id: string } })
     };
 
     fetchOrder();
-  }, [params.id, router]);
+  }, [id, router]);
 
   const handlePaymentSuccess = () => {
-    router.push(`/dashboard/orders/${params.id}`);
+    router.push(`/dashboard/orders/${id}`);
     router.refresh();
   };
 
   const handleCancel = () => {
-    router.push(`/dashboard/orders/${params.id}`);
+    router.push(`/dashboard/orders/${id}`);
   };
 
   if (loading) {
@@ -82,7 +85,7 @@ export default function OrderPaymentPage({ params }: { params: { id: string } })
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Process Payment</h1>
         <Link 
-          href={`/dashboard/orders/${params.id}`} 
+          href={`/dashboard/orders/${id}`} 
           className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
         >
           Back to Order

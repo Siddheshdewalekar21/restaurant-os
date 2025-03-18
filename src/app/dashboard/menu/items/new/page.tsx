@@ -33,8 +33,8 @@ export default function NewMenuItemPage() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await api.get('/api/categories');
-        setCategories(response);
+        const response = await api.get('/categories');
+        setCategories(response.data || []);
       } catch (error: any) {
         console.error('Failed to fetch categories:', error);
         setError(error.message || 'Failed to load categories. Please try again.');
@@ -51,7 +51,7 @@ export default function NewMenuItemPage() {
 
     try {
       console.log('Submitting menu item data:', data);
-      await api.post('/api/menu-items', data);
+      await api.post('/menu-items', data);
       toast.success('Menu item created successfully');
       router.push('/dashboard/menu');
       router.refresh();

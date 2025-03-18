@@ -6,6 +6,7 @@ import Link from 'next/link';
 import axios from 'axios';
 import { Order, OrderStatus, PaymentMethod, PaymentStatus } from '@/types';
 import FeedbackForm from '@/components/FeedbackForm';
+import React from 'react';
 
 interface OrderWithDetails extends Order {
   items: {
@@ -46,6 +47,8 @@ interface OrderWithDetails extends Order {
 }
 
 export default function OrderDetailsPage({ params }: { params: { id: string } }) {
+  // Unwrap params using React.use()
+  const { id } = React.use(params);
   const router = useRouter();
   const [order, setOrder] = useState<OrderWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,17 +70,20 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
     const fetchOrder = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/api/orders/${params.id}`);
-        setOrder(response.data.data);
+        const response = await axios.get(`/api/orders/${id}`);
+        const orderData = response.data.data || response.data;
+        setOrder(orderData);
         
-        // Initialize payment form if payment exists
-        if (response.data.data.payment) {
-          setPaymentMethod(response.data.data.payment.paymentMethod);
-          setPaymentStatus(response.data.data.payment.paymentStatus);
-          setPaymentReference(response.data.data.payment.paymentReference || '');
+        // Initialize payment form if needed
+        if (orderData.payment) {
+          setPaymentMethod(orderData.payment.paymentMethod);
+          setPaymentStatus(orderData.payment.paymentStatus);
+          setPaymentReference(orderData.payment.paymentReference || '');
+        } else {
+          setPaymentMethod('CASH');
+          setPaymentStatus('PENDING');
+          setPaymentReference('');
         }
-        
-        setError('');
       } catch (error: any) {
         console.error('Error fetching order:', error);
         setError(error.response?.data?.error || 'Failed to fetch order details');
@@ -87,14 +93,14 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
     };
 
     fetchOrder();
-  }, [params.id]);
+  }, [id]);
 
   const handleStatusUpdate = async (newStatus: OrderStatus) => {
     try {
       setSubmitting(true);
       setStatusUpdateError('');
       
-      await axios.patch(`/api/orders/${params.id}`, { status: newStatus });
+      await axios.patch(`/api/orders/${id}`, { status: newStatus });
       
       // Update local state
       setOrder(prev => prev ? { ...prev, status: newStatus } : null);
@@ -122,7 +128,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
         paymentReference: paymentReference || undefined,
       };
       
-      const response = await axios.patch(`/api/orders/${params.id}`, paymentData);
+      const response = await axios.patch(`/api/orders/${id}`, paymentData);
       
       // Update local state
       setOrder(prev => prev ? { ...prev, payment: response.data.data } : null);
@@ -145,7 +151,7 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
     
     try {
       setSubmitting(true);
-      await axios.delete(`/api/orders/${params.id}`);
+      await axios.delete(`/api/orders/${id}`);
       router.push('/dashboard/orders');
     } catch (error: any) {
       console.error('Error deleting order:', error);
@@ -157,17 +163,19 @@ export default function OrderDetailsPage({ params }: { params: { id: string } })
   };
 
   const handleFeedbackSuccess = () => {
-    // Refresh order data to show the new feedback
+    // Refresh order data to show the feedback
     const fetchUpdatedOrder = async () => {
       try {
-        const response = await axios.get(`/api/orders/${params.id}`);
-        setOrder(response.data.data);
+        const response = await axios.get(`/api/orders/${id}`);
+        // Check if the response has a data property that contains the order data
+        const orderData = response.data.data || response.data;
+        setOrder(orderData);
         setShowFeedbackForm(false);
       } catch (error) {
-        console.error('Error fetching updated order:', error);
+        console.error('Error refreshing order data:', error);
       }
     };
-    
+
     fetchUpdatedOrder();
   };
 
