@@ -1,0 +1,80 @@
+// Payment model
+model Payment {
+  id                String         @id @default(uuid())
+  amount            Decimal        @db.Decimal(10, 2)
+  paymentMethod     PaymentMethod  @default(CASH)
+  paymentStatus     PaymentStatus  @default(PENDING)
+  paymentReference  String?
+  gatewayName       String?        // Name of payment gateway (RAZORPAY, STRIPE, etc.)
+  gatewayOrderId    String?        // Order ID from payment gateway
+  gatewayPaymentId  String?        // Payment ID from payment gateway
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  order             Order          @relation(fields: [orderId], references: [id])
+  orderId           String         @unique
+  splitPayments     SplitPayment[]
+}
+
+// Split payment model for handling split bills
+model SplitPayment {
+  id                String         @id @default(uuid())
+  amount            Decimal        @db.Decimal(10, 2)
+  paymentMethod     PaymentMethod  @default(CASH)
+  paymentStatus     PaymentStatus  @default(PENDING)
+  paymentReference  String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  payment           Payment        @relation(fields: [paymentId], references: [id])
+  paymentId         String
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  ONLINE
+  WALLET
+  GIFT_CARD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// Update Order model to include GST information
+model Order {
+  // ... existing fields
+  
+  // Add GST fields
+  gstNumber         String?
+  gstType           GSTType?       @default(REGULAR)
+  cgst              Decimal?       @db.Decimal(10, 2)
+  sgst              Decimal?       @db.Decimal(10, 2)
+  igst              Decimal?       @db.Decimal(10, 2)
+  taxInvoiceNumber  String?
+  
+  // ... rest of the model
+}
+
+enum GSTType {
+  REGULAR
+  COMPOSITION
+  EXEMPT
+}
+
+// QR Code table for table ordering
+model QRCode {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  tableId     String?
+  branchId    String
+  isActive    Boolean   @default(true)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  table       Table?    @relation(fields: [tableId], references: [id])
+  branch      Branch    @relation(fields: [branchId], references: [id])
+} 
