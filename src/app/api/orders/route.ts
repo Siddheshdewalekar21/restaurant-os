@@ -1,13 +1,18 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { orderSchema } from '@/utils/validation';
-import { successResponse, errorResponse, unauthorizedResponse, validationErrorResponse, serverErrorResponse } from '@/utils/api';
 
 // GET /api/orders - Get all orders
 export async function GET(request: NextRequest) {
   try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
     const tableId = searchParams.get('tableId');
@@ -54,10 +59,13 @@ export async function GET(request: NextRequest) {
       },
     });
     
-    return successResponse(orders);
-  } catch (error) {
+    return NextResponse.json(orders);
+  } catch (error: any) {
     console.error('Error fetching orders:', error);
-    return errorResponse('Failed to fetch orders', 500);
+    return NextResponse.json(
+      { error: error.message || 'Failed to fetch orders' },
+      { status: 500 }
+    );
   }
 }
 
@@ -67,9 +75,9 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const session = await getServerSession(authOptions);
     if (!session) {
-      return unauthorizedResponse();
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     // Parse request body
     let body;
     try {
@@ -77,16 +85,22 @@ export async function POST(request: NextRequest) {
       console.log('Received order data:', body);
     } catch (error) {
       console.error('Error parsing request body:', error);
-      return validationErrorResponse({ _error: ['Invalid JSON in request body'] });
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
     }
-    
+
     // Validate request body
     try {
       const result = orderSchema.safeParse(body);
       
       if (!result.success) {
         console.error('Validation error:', result.error.flatten());
-        return validationErrorResponse(result.error.flatten().fieldErrors);
+        return NextResponse.json(
+          { error: 'Validation error', errors: result.error.flatten().fieldErrors },
+          { status: 400 }
+        );
       }
       
       const { type, tableId, items, customerId } = result.data;
@@ -98,13 +112,17 @@ export async function POST(request: NextRequest) {
         });
         
         if (!table) {
-          console.error(`Table not found with ID: ${tableId}`);
-          return errorResponse(`Table not found with ID: ${tableId}`, 404);
+          return NextResponse.json(
+            { error: `Table not found with ID: ${tableId}` },
+            { status: 404 }
+          );
         }
         
         if (table.status !== 'AVAILABLE' && type === 'DINE_IN') {
-          console.error(`Table ${tableId} is not available. Current status: ${table.status}`);
-          return errorResponse(`Table is not available. Current status: ${table.status}`, 400);
+          return NextResponse.json(
+            { error: `Table is not available. Current status: ${table.status}` },
+            { status: 400 }
+          );
         }
       }
       
@@ -115,8 +133,10 @@ export async function POST(request: NextRequest) {
         });
         
         if (!customer) {
-          console.error(`Customer not found with ID: ${customerId}`);
-          return errorResponse(`Customer not found with ID: ${customerId}`, 404);
+          return NextResponse.json(
+            { error: `Customer not found with ID: ${customerId}` },
+            { status: 404 }
+          );
         }
       }
       
@@ -131,15 +151,19 @@ export async function POST(request: NextRequest) {
       if (menuItems.length !== menuItemIds.length) {
         const foundIds = menuItems.map(item => item.id);
         const missingIds = menuItemIds.filter(id => !foundIds.includes(id));
-        console.error(`Menu items not found: ${missingIds.join(', ')}`);
-        return errorResponse(`Menu items not found: ${missingIds.join(', ')}`, 404);
+        return NextResponse.json(
+          { error: `Menu items not found: ${missingIds.join(', ')}` },
+          { status: 404 }
+        );
       }
       
       const unavailableItems = menuItems.filter(item => !item.isAvailable);
       if (unavailableItems.length > 0) {
         const unavailableNames = unavailableItems.map(item => item.name).join(', ');
-        console.error(`Some items are not available: ${unavailableNames}`);
-        return errorResponse(`Some items are not available: ${unavailableNames}`, 400);
+        return NextResponse.json(
+          { error: `Some items are not available: ${unavailableNames}` },
+          { status: 400 }
+        );
       }
       
       // Calculate order totals
@@ -156,74 +180,61 @@ export async function POST(request: NextRequest) {
           menuItemId: item.menuItemId,
           quantity: item.quantity,
           price: price,
-          notes: item.notes || '',
+          notes: item.notes || ''
         };
       });
-      
-      // Apply tax (assuming 10% tax)
-      const tax = totalAmount * 0.1;
-      const grandTotal = totalAmount + tax;
-      
+
       // Generate order number
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
-      
-      console.log('Creating order with data:', {
-        orderNumber,
-        status: 'PENDING',
-        type,
-        total: totalAmount,
-        tax,
-        discount: 0,
-        grandTotal,
-        tableId,
-        userId: session.user.id,
-        branchId: session.user.branchId || 'main-branch',
-        customerId,
-        items: orderItems
-      });
-      
-      // Create order
+      const orderNumber = `ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Create the order
       const order = await prisma.order.create({
         data: {
           orderNumber,
-          status: 'PENDING',
           type,
-          total: totalAmount,
-          tax,
-          discount: 0,
-          grandTotal,
-          tableId,
+          status: 'PENDING',
+          tableId: tableId || null,
+          customerId: customerId || null,
           userId: session.user.id,
-          branchId: session.user.branchId || 'main-branch', // Default to main branch if not specified
-          customerId,
+          branchId: session.user.branchId || 'branch-main-01', // Default to main branch if not specified
+          total: totalAmount,
+          tax: totalAmount * 0.1, // 10% tax
+          grandTotal: totalAmount + (totalAmount * 0.1),
           items: {
-            create: orderItems,
-          },
+            create: orderItems
+          }
         },
         include: {
           items: {
             include: {
-              menuItem: true,
-            },
+              menuItem: true
+            }
           },
-        },
+          table: true
+        }
       });
-      
+
       // If it's a dine-in order, update table status
       if (type === 'DINE_IN' && tableId) {
         await prisma.table.update({
           where: { id: tableId },
-          data: { status: 'OCCUPIED' },
+          data: { status: 'OCCUPIED' }
         });
       }
-      
-      return successResponse(order, 'Order created successfully');
-    } catch (error) {
-      console.error('Error validating or processing order:', error);
-      return serverErrorResponse('Failed to process order: ' + (error instanceof Error ? error.message : String(error)));
+
+      return NextResponse.json(order);
+    } catch (error: any) {
+      console.error('Error validating order data:', error);
+      return NextResponse.json(
+        { error: error.message || 'Validation error' },
+        { status: 400 }
+      );
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating order:', error);
-    return serverErrorResponse('Failed to create order: ' + (error instanceof Error ? error.message : String(error)));
+    return NextResponse.json(
+      { error: error.message || 'Failed to create order' },
+      { status: 500 }
+    );
   }
 } 

@@ -1,0 +1,90 @@
+You are a professional software engineer, you are working on a project called RestaurantOS.
+Do not use anything from the web until I ask you!
+
+{
+  "rules": {
+    "project_goal": {
+      "description": "The project should focus on building a scalable and efficient restaurant management system using Next.js, MySQL, and Prisma.",
+      "example": "RestaurantOS is a Next.js-based restaurant management system with real-time order tracking and POS integration."
+    },
+    "tech_stack": {
+      "description": "Use the latest stable versions of TypeScript, JavaScript, React, Node.js, Next.js, Tailwind CSS, and Prisma.",
+      "example": "Next.js 14, TypeScript 5.x, Node.js 20.x, Tailwind CSS 3.x"
+    },
+    "naming_conventions": {
+      "description": "Use camelCase for variables and functions, PascalCase for components, and SCREAMING_SNAKE_CASE for constants.",
+      "example": "const API_URL = 'https://api.example.com';"
+    },
+    "style_and_structure": {
+      "description": "Ensure consistent code formatting using Prettier and follow a modular structure.",
+      "example": "Use separate folders for components, services, hooks, and utils."
+    },
+    "typescript_usage": {
+      "description": "Use TypeScript for type safety and define types/interfaces for props and states.",
+      "example": "type Order = { id: number; status: string; }"
+    },
+    "ui_and_styling": {
+      "description": "Use Tailwind CSS for styling and maintain responsive, accessible design.",
+      "example": "Use 'flex', 'grid', and 'gap' utilities for layout."
+    },
+    "performance_optimization": {
+      "description": "Optimize performance by implementing caching, lazy loading, and reducing re-renders.",
+      "example": "Use React.memo for component memoization."
+    },
+    "error_handling": {
+      "description": "Implement error handling using try-catch blocks and provide user-friendly error messages.",
+      "example": "Display a toast notification when an API call fails."
+    },
+    "security_best_practices": {
+      "description": "Avoid hard-coded secrets, use HTTPS, and secure API endpoints.",
+      "example": "Use environment variables for API keys and secure JWT tokens."
+    },
+    "testing_guidelines": {
+      "description": "Write unit tests using Jest and integration tests using Cypress.",
+      "example": "Test API calls and user interactions."
+    },
+    "dine_in_management": {
+      "description": "Implement floor plan UI and table status tracking.",
+      "example": "Use a draggable grid for table layout."
+    },
+    "order_management": {
+      "description": "Track order status in real-time and allow modifications before confirmation.",
+      "example": "Use WebSockets for live order updates."
+    },
+    "inventory_management": {
+      "description": "Maintain stock levels and generate alerts for low inventory.",
+      "example": "Send admin notifications for low stock."
+    },
+    "payment_integration": {
+      "description": "Allow payments via Razorpay, Stripe, and UPI with detailed invoices.",
+      "example": "Generate PDF receipts after payment confirmation."
+    },
+    "customer_engagement": {
+      "description": "Create loyalty programs and gather customer feedback.",
+      "example": "Reward points for repeat customers."
+    },
+    "multi_branch_support": {
+      "description": "Allow multi-branch management with role-based access control.",
+      "example": "Create separate dashboards for each branch."
+    },
+    "third_party_integration": {
+      "description": "Integrate with Swiggy, Zomato, and Google Maps.",
+      "example": "Sync order details with Swiggy and show delivery tracking on Google Maps."
+    },
+    "deployment_and_scaling": {
+      "description": "Deploy on AWS/Vercel with Docker and load balancing.",
+      "example": "Use Redis for caching and AWS for deployment."
+    },
+    "general_guidelines": {
+      "description": "Don't skip any steps, and ensure complete feature implementation.",
+      "example": "All core features should work end-to-end before deployment."
+    }
+    "protected_commands": {
+  "description": "Block dangerous commands from execution in YOLO mode.",
+  "pattern": ".*(rm -rf /|git reset --hard|shutdown -h now|killall -9).*",
+  "example": "rm -rf /"
+}
+
+  }
+}
+

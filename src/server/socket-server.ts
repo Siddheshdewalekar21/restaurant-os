@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Server, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { verify } from 'jsonwebtoken';
@@ -280,3 +281,6 @@ process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
 module.exports = io; 
+=======
+const PORT = 3002; 
+>>>>>>> master
