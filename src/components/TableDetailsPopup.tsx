@@ -22,10 +22,12 @@ interface TableDetails {
       quantity: number;
       menuItem: {
         name: string;
-        price: number;
+        price: number | string;
       };
     }>;
-    totalAmount: number;
+    total: number;
+    tax: number;
+    grandTotal: number;
     createdAt: string;
     paymentStatus: 'PAID' | 'PENDING';
   };
@@ -157,20 +159,54 @@ export default function TableDetailsPopup({ tableId, onClose }: TableDetailsPopu
               )}
 
               <div className="space-y-2 mt-4">
-                {tableDetails.currentOrder.items.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm">
-                    <span>
-                      {item.quantity}x {item.menuItem.name}
-                    </span>
-                    <span className="text-gray-600">
-                      ${(item.menuItem.price * item.quantity).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-                <div className="border-t pt-2 mt-2 font-medium flex justify-between">
-                  <span>Total</span>
-                  <span>${tableDetails.currentOrder.totalAmount.toFixed(2)}</span>
-                </div>
+                {tableDetails.currentOrder.items.map((item, index) => {
+                  const price = typeof item.menuItem.price === 'string' 
+                    ? parseFloat(item.menuItem.price) 
+                    : item.menuItem.price;
+                  const quantity = item.quantity || 0;
+                  const itemTotal = !isNaN(price) ? price * quantity : 0;
+                  
+                  return (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>
+                        {quantity}x {item.menuItem.name}
+                      </span>
+                      <span className="text-gray-600">
+                        ${itemTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+                
+                {(() => {
+                  const subtotal = tableDetails.currentOrder.items.reduce((total, item) => {
+                    const price = typeof item.menuItem.price === 'string' 
+                      ? parseFloat(item.menuItem.price) 
+                      : item.menuItem.price;
+                    const quantity = item.quantity || 0;
+                    return total + (!isNaN(price) ? price * quantity : 0);
+                  }, 0);
+                  
+                  const tax = subtotal * 0.1;
+                  const grandTotal = subtotal + tax;
+                  
+                  return (
+                    <>
+                      <div className="border-t pt-2 mt-2 font-medium flex justify-between">
+                        <span>Subtotal</span>
+                        <span>${subtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="border-t pt-2 font-medium flex justify-between">
+                        <span>Tax (10%)</span>
+                        <span>${tax.toFixed(2)}</span>
+                      </div>
+                      <div className="border-t pt-2 font-medium flex justify-between">
+                        <span>Total</span>
+                        <span>${grandTotal.toFixed(2)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div className="flex gap-2 mt-4">

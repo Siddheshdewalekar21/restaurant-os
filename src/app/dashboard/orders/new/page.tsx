@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
 import { MenuItem, Table, OrderType } from '@/types';
@@ -14,10 +14,34 @@ interface OrderItem {
   menuItemId: string;
   quantity: number;
   notes?: string;
+  name: string;      // Store item name directly
+  price: number;     // Store item price directly
+}
+
+// Debugging function to validate an order item
+function validateOrderItem(item: OrderItem): boolean {
+  if (!item) {
+    console.error('Order item is null or undefined');
+    return false;
+  }
+  
+  if (!item.menuItemId) {
+    console.error('Order item missing menuItemId', item);
+    return false;
+  }
+  
+  if (typeof item.quantity !== 'number' || item.quantity < 1) {
+    console.error('Order item has invalid quantity', item);
+    return false;
+  }
+  
+  return true;
 }
 
 export default function NewOrderPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTableId = searchParams?.get('tableId') || '';
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,11 +52,13 @@ export default function NewOrderPage() {
   
   // Order form state
   const [orderType, setOrderType] = useState<OrderType>('DINE_IN');
-  const [tableId, setTableId] = useState<string>('');
-  const [customerId, setCustomerId] = useState<string>('');
+  const [tableId, setTableId] = useState<string>(initialTableId);
+  const [customerName, setCustomerName] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<OrderItem[]>([]);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [tablesError, setTablesError] = useState<string>('');
 
   // Handle network status change
   const handleNetworkStatusChange = (isOnline: boolean) => {
@@ -49,86 +75,99 @@ export default function NewOrderPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
-      console.log('Fetching data from API...');
-      
-      // Log the API base URL
-      console.log('API base URL:', process.env.NEXT_PUBLIC_API_URL || '/api');
-      
-      // Try to fetch menu items first
-      try {
-        console.log('Fetching menu items...');
-        const menuResponse = await api.get('/menu-items');
-        console.log('Menu items fetched successfully:', menuResponse);
-        setMenuItems(menuResponse);
-      } catch (menuError) {
-        console.error('Error fetching menu items:', menuError);
-        // Try direct axios as fallback
-        try {
-          console.log('Trying direct axios for menu items...');
-          const directMenuResponse = await axios.get('/api/menu-items');
-          console.log('Menu items fetched with direct axios:', directMenuResponse.data);
-          setMenuItems(directMenuResponse.data.data || []);
-        } catch (directMenuError) {
-          console.error('Direct axios for menu items also failed:', directMenuError);
-        }
-      }
-      
-      // Try to fetch tables
-      try {
-        console.log('Fetching tables...');
-        const tablesResponse = await api.get('/tables?status=AVAILABLE');
-        console.log('Tables fetched successfully:', tablesResponse);
-        setTables(tablesResponse);
-      } catch (tablesError) {
-        console.error('Error fetching tables:', tablesError);
-        // Try direct axios as fallback
-        try {
-          console.log('Trying direct axios for tables...');
-          const directTablesResponse = await axios.get('/api/tables?status=AVAILABLE');
-          console.log('Tables fetched with direct axios:', directTablesResponse.data);
-          setTables(directTablesResponse.data.data || []);
-        } catch (directTablesError) {
-          console.error('Direct axios for tables also failed:', directTablesError);
-        }
-      }
-      
-      // Try to fetch categories
-      try {
-        console.log('Fetching categories...');
-        const categoriesResponse = await api.get('/categories');
-        console.log('Categories fetched successfully:', categoriesResponse);
-        setCategories(categoriesResponse);
-      } catch (categoriesError) {
-        console.error('Error fetching categories:', categoriesError);
-        // Try direct axios as fallback
-        try {
-          console.log('Trying direct axios for categories...');
-          const directCategoriesResponse = await axios.get('/api/categories');
-          console.log('Categories fetched with direct axios:', directCategoriesResponse.data);
-          setCategories(directCategoriesResponse.data.data || []);
-        } catch (directCategoriesError) {
-          console.error('Direct axios for categories also failed:', directCategoriesError);
-        }
-      }
-      
       setError('');
+
+      // Fetch categories
+      try {
+        const categoriesResponse = await api.get('/categories');
+        if (categoriesResponse && Array.isArray(categoriesResponse.data)) {
+          setCategories(categoriesResponse.data || []);
+        } else {
+          console.warn('Invalid categories response format:', categoriesResponse);
+          // Try direct fetch
+          const directCategoriesResponse = await axios.get('/api/categories');
+          setCategories(directCategoriesResponse.data?.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategories([]);
+      }
+
+      // Fetch menu items
+      try {
+        const menuResponse = await api.get('/menu-items');
+        if (menuResponse && Array.isArray(menuResponse.data)) {
+          setMenuItems(menuResponse.data || []);
+        } else {
+          console.warn('Invalid menu items response format:', menuResponse);
+          // Try direct fetch
+          const directMenuResponse = await axios.get('/api/menu-items');
+          setMenuItems(directMenuResponse.data?.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching menu items:', error);
+        setMenuItems([]);
+      }
+
+      // Fetch tables with better error handling and fallbacks
+      try {
+        // First attempt with our API client
+        const tablesResponse = await api.get('/tables');
+        console.log('Tables response:', tablesResponse);
+        
+        if (tablesResponse && Array.isArray(tablesResponse.data)) {
+          setTables(tablesResponse.data);
+        } else {
+          console.warn('No data in tables response, trying direct fetch');
+          
+          // Try with direct fetch to the API endpoint
+          const directResponse = await fetch('/api/tables');
+          if (!directResponse.ok) {
+            throw new Error(`Direct fetch failed: ${directResponse.status}`);
+          }
+          
+          const tables = await directResponse.json();
+          console.log('Direct fetch tables response:', tables);
+          
+          if (Array.isArray(tables)) {
+            setTables(tables);
+          } else if (tables && Array.isArray(tables.data)) {
+            setTables(tables.data);
+          } else {
+            // Last resort: try Axios directly
+            const axiosResponse = await axios.get('/api/tables');
+            console.log('Axios direct tables response:', axiosResponse.data);
+            setTables(axiosResponse.data?.data || []);
+          }
+        }
+      } catch (tableError) {
+        console.error('Error fetching tables:', tableError);
+        // Create some demo tables as fallback for testing
+        setTables([
+          { id: 'table-1', tableNumber: 1, capacity: 4, status: 'AVAILABLE' },
+          { id: 'table-2', tableNumber: 2, capacity: 2, status: 'AVAILABLE' },
+          { id: 'table-3', tableNumber: 3, capacity: 6, status: 'AVAILABLE' }
+        ]);
+        setTablesError('Could not load tables, using demo data');
+      }
+
+      // Fetch customers
+      try {
+        const customersResponse = await api.get('/customers');
+        if (customersResponse && Array.isArray(customersResponse.data)) {
+          setCustomers(customersResponse.data || []);
+        } else {
+          // Try direct fetch
+          const directCustomersResponse = await axios.get('/api/customers');
+          setCustomers(directCustomersResponse.data?.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        setCustomers([]);
+      }
     } catch (error: any) {
-      console.error('Error in fetchData:', error);
-      
-      // More detailed error logging
-      if (error instanceof ApiError) {
-        console.error(`API Error (${error.status}):`, error.message);
-        console.error('Error data:', error.data);
-      }
-      
-      setError('Failed to load data. Please try again.');
-      toast.error('Failed to load data. Please refresh the page.');
-      
-      // Show network check component if we have a network error
-      if (error.message === 'Network Error') {
-        setShowNetworkCheck(true);
-      }
+      console.error('Error fetching data:', error);
+      setError(error.message || 'Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -138,7 +177,33 @@ export default function NewOrderPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    // If we have an initial tableId, make sure orderType is DINE_IN
+    if (initialTableId) {
+      setOrderType('DINE_IN');
+    }
+  }, [initialTableId]);
+
   const handleAddItem = (menuItem: MenuItem) => {
+    if (!menuItem || !menuItem.id || !menuItem.name) {
+      console.error('Invalid menu item:', menuItem);
+      toast.error('Cannot add invalid menu item');
+      return;
+    }
+
+    // Ensure price is a valid number
+    const price = typeof menuItem.price === 'number' 
+      ? menuItem.price 
+      : typeof menuItem.price === 'string' 
+        ? parseFloat(menuItem.price) 
+        : 0;
+    
+    if (isNaN(price)) {
+      console.error('Invalid price for menu item:', menuItem);
+      toast.error('Menu item has invalid price');
+      return;
+    }
+    
     // Check if item already exists in the order
     const existingItemIndex = selectedItems.findIndex(item => item.menuItemId === menuItem.id);
     
@@ -147,19 +212,31 @@ export default function NewOrderPage() {
       const updatedItems = [...selectedItems];
       updatedItems[existingItemIndex].quantity += 1;
       setSelectedItems(updatedItems);
+      toast.success(`Added another ${menuItem.name}`);
     } else {
-      // Add new item
-      setSelectedItems([...selectedItems, {
+      // Add new item with name and price stored directly
+      const newItem: OrderItem = {
         menuItemId: menuItem.id,
+        name: menuItem.name,
+        price: price,
         quantity: 1,
         notes: '',
-      }]);
+      };
+      
+      setSelectedItems([...selectedItems, newItem]);
+      toast.success(`Added ${menuItem.name}`);
     }
   };
 
   const handleRemoveItem = (index: number) => {
     const updatedItems = [...selectedItems];
+    const removedItem = updatedItems[index];
     updatedItems.splice(index, 1);
+    
+    if (removedItem?.name) {
+      toast.success(`Removed ${removedItem.name}`);
+    }
+    
     setSelectedItems(updatedItems);
   };
 
@@ -167,21 +244,35 @@ export default function NewOrderPage() {
     if (quantity < 1) return;
     
     const updatedItems = [...selectedItems];
+    if (!updatedItems[index]) return;
+    
     updatedItems[index].quantity = quantity;
     setSelectedItems(updatedItems);
   };
 
   const handleNotesChange = (index: number, notes: string) => {
     const updatedItems = [...selectedItems];
+    if (!updatedItems[index]) return;
+    
     updatedItems[index].notes = notes;
     setSelectedItems(updatedItems);
   };
 
-  const calculateTotal = () => {
+  // Calculate subtotal using item's stored price
+  const calculateSubtotal = () => {
     return selectedItems.reduce((total, item) => {
-      const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
-      return total + (menuItem ? Number(menuItem.price) * item.quantity : 0);
+      return total + (item.price * item.quantity);
     }, 0);
+  };
+
+  // Calculate tax
+  const calculateTax = () => {
+    return calculateSubtotal() * 0.1;
+  };
+
+  // Calculate total
+  const calculateTotal = () => {
+    return calculateSubtotal() + calculateTax();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,15 +293,16 @@ export default function NewOrderPage() {
     setValidationErrors({});
     
     try {
-      // Prepare order data with the correct format for tableId and customerId
+      // Prepare order data, using customerName directly instead of customerId
       const orderData = {
         type: orderType,
         // For DINE_IN, provide the tableId as a string, otherwise null
         tableId: orderType === 'DINE_IN' ? tableId : null,
-        // Provide customerId as a string if it exists, otherwise null
-        customerId: customerId && customerId.trim() !== '' ? customerId : null,
+        // Pass customer name directly in the order data
+        customerName: customerName && customerName.trim() !== '' ? customerName : null,
         items: selectedItems.map(item => ({
-          ...item,
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
           // Ensure notes is a string, not undefined
           notes: item.notes || ''
         })),
@@ -227,103 +319,57 @@ export default function NewOrderPage() {
           throw new Error('Network Error');
         }
         
-        // Try with retryNetworkErrors for better resilience
-        await retryNetworkErrors(async () => {
-          console.log('Sending POST request to /orders endpoint');
-          const response = await api.post('/orders', orderData);
-          console.log('Order created successfully:', response);
-          return response;
-        }, 2); // Retry up to 2 times
+        // Try with direct axios approach
+        const response = await axios.post('/api/orders', orderData, {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
         
+        console.log('Order created successfully:', response.data);
         toast.success('Order created successfully!');
+        toast.dismiss(loadingToast);
         router.push('/dashboard/orders');
         router.refresh();
+        return;
       } catch (apiError: any) {
-        console.error('API client error:', apiError);
+        console.error('API error:', apiError);
+        toast.dismiss(loadingToast);
         
-        // Handle validation errors
-        if (apiError instanceof ApiError && apiError.status === 422) {
-          setValidationErrors(apiError.data || {});
-          setError('Please correct the validation errors below.');
-          toast.error('Validation error. Please check the form.');
-          toast.dismiss(loadingToast);
-          setSubmitting(false);
-          return;
-        }
-        
-        // Handle 404 errors specifically
-        if (apiError instanceof ApiError && apiError.status === 404) {
-          setError(`Resource not found: ${apiError.message}`);
-          toast.error('Resource not found. Please check your configuration.');
-          console.error('Trying direct axios fallback due to 404 error');
-          toast.dismiss(loadingToast);
+        // Check if we have a response with error details
+        if (apiError.response) {
+          const { status, data } = apiError.response;
           
-          // Try with direct axios as a fallback, using the full URL
-          try {
-            const response = await axios.post('http://localhost:3000/api/orders', orderData);
-            console.log('Order created successfully with direct axios:', response.data);
-            toast.success('Order created successfully!');
-            router.push('/dashboard/orders');
-            router.refresh();
-            return;
-          } catch (directError: any) {
-            console.error('Direct axios fallback also failed:', directError);
-            setSubmitting(false);
-            return;
-          }
-        }
-        
-        // Handle 500 errors specifically
-        if (apiError instanceof ApiError && apiError.status === 500) {
-          setError(`Server error: ${apiError.message}`);
-          toast.error('Server error. Please try again later.');
-          console.error('Server error details:', apiError.data);
-          toast.dismiss(loadingToast);
-          setSubmitting(false);
-          return;
-        }
-        
-        // Fall back to direct axios if our API client fails
-        try {
-          console.log('Falling back to direct axios');
-          await retryNetworkErrors(async () => {
-            const response = await axios.post('/api/orders', orderData, {
-              timeout: 15000, // Increase timeout for this specific request
-            });
-            console.log('Order created successfully with axios fallback:', response.data);
-            return response;
-          }, 1); // Retry only once
-          
-          toast.success('Order created successfully!');
-          router.push('/dashboard/orders');
-          router.refresh();
-        } catch (axiosError: any) {
-          console.error('Axios fallback error:', axiosError);
-          
-          // Check for validation errors in axios response
-          if (axiosError.response?.status === 422) {
-            const validationData = axiosError.response.data?.errors || {};
+          // Handle validation errors
+          if (status === 422 || status === 400) {
+            const validationData = data?.errors || {};
             setValidationErrors(validationData);
-            setError('Please correct the validation errors below.');
+            setError(data?.error || 'Please correct the validation errors below.');
             toast.error('Validation error. Please check the form.');
-          } else if (axiosError.response?.status === 404) {
-            // Handle 404 errors
-            const errorMessage = axiosError.response.data?.error || 'Resource not found';
+          }
+          // Handle not found errors
+          else if (status === 404) {
+            const errorMessage = data?.error || 'Resource not found';
             setError(`Not found: ${errorMessage}`);
             toast.error('Resource not found. Please check your configuration.');
-            console.error('404 error details:', axiosError.response.data);
-          } else if (axiosError.response?.status === 500) {
-            // Handle server errors
-            const errorMessage = axiosError.response.data?.error || 'Server error. Please try again later.';
+          }
+          // Handle server errors
+          else if (status === 500) {
+            const errorMessage = data?.error || 'Server error. Please try again later.';
             setError(`Server error: ${errorMessage}`);
             toast.error('Server error. Please try again later.');
-            console.error('Server error details:', axiosError.response.data);
-          } else {
-            throw axiosError;
           }
+          // Handle other status codes
+          else {
+            setError(`Error: ${data?.error || 'Unknown error occurred'}`);
+            toast.error('Failed to create order. Please try again.');
+          }
+        } else {
+          // Network or other client-side errors
+          setError(`Error: ${apiError.message || 'Unknown error occurred'}`);
+          toast.error('Failed to create order. Please check your connection.');
+          setShowNetworkCheck(true);
         }
-      } finally {
-        toast.dismiss(loadingToast);
       }
     } catch (error: any) {
       console.error('Failed to create order:', error);
@@ -341,14 +387,69 @@ export default function NewOrderPage() {
         setError(errorMessage);
         toast.error(errorMessage);
       }
-      
+    } finally {
       setSubmitting(false);
     }
   };
 
-  const filteredMenuItems = categoryFilter 
-    ? menuItems.filter(item => item.categoryId === categoryFilter)
-    : menuItems;
+  const filteredMenuItems = useMemo(() => {
+    console.log('Filtering menu items with categoryFilter:', categoryFilter);
+    console.log('Total menu items available:', menuItems.length);
+    
+    // Validate menu items
+    if (!Array.isArray(menuItems)) {
+      console.error('menuItems is not an array');
+      return [];
+    }
+    
+    const filtered = categoryFilter 
+      ? menuItems.filter(item => item.categoryId === categoryFilter)
+      : menuItems;
+    
+    console.log('Filtered menu items count:', filtered.length);
+    
+    // Verify that filtered items have all required properties
+    const validItems = filtered.filter(item => {
+      const isValid = item && item.id && item.name && item.price !== undefined;
+      if (!isValid) {
+        console.warn('Invalid menu item found:', item);
+      }
+      return isValid;
+    });
+    
+    console.log('Valid menu items count:', validItems.length);
+    return validItems;
+  }, [menuItems, categoryFilter]);
+
+  // Function to create a test table if none exist
+  const createTestTable = async () => {
+    try {
+      setError('');
+      const loadingToast = toast.loading('Creating test table...');
+      
+      const testTableData = {
+        tableNumber: 1,
+        capacity: 4,
+        branchId: 'branch-main-01', 
+        positionX: 50,
+        positionY: 50,
+        shape: 'CIRCLE',
+        width: 100,
+        height: 100
+      };
+      
+      // Try to create the table
+      const response = await axios.post('/api/tables', testTableData);
+      console.log('Test table created:', response.data);
+      
+      toast.success('Test table created successfully!');
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      console.error('Failed to create test table:', error);
+      toast.error('Could not create test table. Please contact support.');
+    }
+  };
 
   if (loading) {
     return (
@@ -392,7 +493,7 @@ export default function NewOrderPage() {
           <ul className="list-disc list-inside">
             {Object.entries(validationErrors).map(([field, errors]) => (
               <li key={field}>
-                <span className="font-medium">{field}:</span> {Array.isArray(errors) ? errors.join(', ') : errors}
+                <span className="font-medium">{field}:</span> {Array.isArray(errors) ? errors.join(', ') : String(errors)}
               </li>
             ))}
           </ul>
@@ -433,156 +534,224 @@ export default function NewOrderPage() {
             
             {/* Menu Items Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredMenuItems.map((item) => (
-                <div 
-                  key={item.id} 
-                  className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${!item.isAvailable ? 'opacity-50' : ''}`}
-                  onClick={() => item.isAvailable && handleAddItem(item)}
-                >
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-sm text-gray-500 mb-2">{item.description}</div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold">${Number(item.price).toFixed(2)}</span>
-                    {!item.isAvailable && (
-                      <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
-                        Unavailable
-                      </span>
-                    )}
-                  </div>
+              {filteredMenuItems.length === 0 ? (
+                <div className="col-span-full p-4 text-center bg-gray-50 rounded-md">
+                  <p className="text-gray-500">No menu items available.</p>
                 </div>
-              ))}
+              ) : (
+                filteredMenuItems.map((item) => (
+                  <div 
+                    key={item.id} 
+                    className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 ${!item.isAvailable ? 'opacity-50' : ''}`}
+                    onClick={() => item.isAvailable && handleAddItem(item)}
+                  >
+                    <div className="font-medium">{item.name}</div>
+                    <div className="text-sm text-gray-500 mb-2">{item.description}</div>
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold">${typeof item.price === 'number' ? 
+                        item.price.toFixed(2) : 
+                        parseFloat(String(item.price || 0)).toFixed(2)}</span>
+                      {!item.isAvailable && (
+                        <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">
+                          Unavailable
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
         {/* Order Summary Section */}
         <div className="lg:col-span-1">
-          <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6 sticky top-6">
             <h2 className="text-xl font-semibold mb-4">Order Summary</h2>
             
-            {/* Order Type */}
-            <div className="mb-4">
-              <label htmlFor="orderType" className="block text-sm font-medium text-gray-700 mb-1">
-                Order Type
-              </label>
-              <select
-                id="orderType"
-                value={orderType}
-                onChange={(e) => setOrderType(e.target.value as OrderType)}
-                className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="DINE_IN">Dine In</option>
-                <option value="TAKEAWAY">Takeaway</option>
-                <option value="DELIVERY">Delivery</option>
-                <option value="ONLINE">Online</option>
-              </select>
-            </div>
-            
-            {/* Table Selection (for Dine In) */}
-            {orderType === 'DINE_IN' && (
-              <div className="mb-4">
-                <label htmlFor="table" className="block text-sm font-medium text-gray-700 mb-1">
-                  Table
+            {/* Order Type and Table Selection */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="orderType" className="block text-sm font-medium text-gray-700">
+                  Order Type
                 </label>
                 <select
-                  id="table"
-                  value={tableId}
-                  onChange={(e) => setTableId(e.target.value)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  required
+                  id="orderType"
+                  value={orderType}
+                  onChange={(e) => setOrderType(e.target.value as OrderType)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                 >
-                  <option value="">Select a table</option>
-                  {tables.map((table) => (
-                    <option key={table.id} value={table.id}>
-                      Table {table.tableNumber} ({table.capacity} seats)
-                    </option>
-                  ))}
+                  <option value="DINE_IN">Dine In</option>
+                  <option value="TAKEAWAY">Takeaway</option>
+                  <option value="DELIVERY">Delivery</option>
                 </select>
               </div>
-            )}
-            
-            {/* Selected Items */}
-            <div className="mb-4">
-              <h3 className="text-lg font-medium mb-2">Items</h3>
-              {selectedItems.length === 0 ? (
-                <div className="text-gray-500 italic">No items selected</div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedItems.map((item, index) => {
-                    const menuItem = menuItems.find(mi => mi.id === item.menuItemId);
-                    return (
-                      <div key={index} className="flex flex-col p-3 border rounded-lg">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium">{menuItem?.name}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-red-600 hover:text-red-800"
+              
+              {orderType === 'DINE_IN' && (
+                <div>
+                  <label htmlFor="tableId" className="block text-sm font-medium text-gray-700">
+                    Table
+                  </label>
+                  <div className="relative">
+                    <select
+                      id="tableId"
+                      value={tableId}
+                      onChange={(e) => setTableId(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                      required={orderType === 'DINE_IN'}
+                    >
+                      <option value="">Select a table</option>
+                      {tables.length > 0 ? (
+                        tables.map((table) => (
+                          <option
+                            key={table.id}
+                            value={table.id}
+                            disabled={table.status && ['OCCUPIED', 'RESERVED'].includes(table.status)}
                           >
-                            Remove
-                          </button>
-                        </div>
-                        <div className="flex items-center mb-2">
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityChange(index, item.quantity - 1)}
-                            className="px-2 py-1 bg-gray-200 rounded-l-md"
-                          >
-                            -
-                          </button>
-                          <span className="px-4 py-1 bg-gray-100">
-                            {item.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleQuantityChange(index, item.quantity + 1)}
-                            className="px-2 py-1 bg-gray-200 rounded-r-md"
-                          >
-                            +
-                          </button>
-                          <span className="ml-auto">
-                            ${menuItem ? (Number(menuItem.price) * item.quantity).toFixed(2) : '0.00'}
-                          </span>
-                        </div>
-                        <input
-                          type="text"
-                          placeholder="Special instructions"
-                          value={item.notes || ''}
-                          onChange={(e) => handleNotesChange(index, e.target.value)}
-                          className="w-full mt-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                        />
+                            Table {table.tableNumber} ({table.capacity} seats) 
+                            {table.status ? ` - ${table.status}` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="" disabled>
+                          No tables available
+                        </option>
+                      )}
+                    </select>
+                    
+                    {tables.length === 0 && (
+                      <div className="mt-2">
+                        <p className="text-red-500 text-sm">No tables found. Please add tables first.</p>
+                        <button
+                          type="button"
+                          onClick={createTestTable}
+                          className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200"
+                        >
+                          Create Test Table
+                        </button>
                       </div>
-                    );
-                  })}
+                    )}
+                    
+                    {tablesError && (
+                      <p className="mt-2 text-red-500 text-sm">{tablesError}</p>
+                    )}
+                    
+                    <button
+                      type="button"
+                      onClick={fetchData}
+                      className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Refresh tables
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
-            
-            {/* Order Totals */}
-            <div className="border-t pt-4 mb-6">
-              <div className="flex justify-between mb-2">
-                <span>Subtotal</span>
-                <span>${calculateTotal().toFixed(2)}</span>
+              
+              {/* Customer Name Input */}
+              <div>
+                <label htmlFor="customerName" className="block text-sm font-medium text-gray-700">
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  id="customerName"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Enter customer name"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
               </div>
-              <div className="flex justify-between mb-2">
-                <span>Tax (10%)</span>
-                <span>${(calculateTotal() * 0.1).toFixed(2)}</span>
+              
+              {/* Debug info - can be removed in production */}
+              <div className="p-2 text-xs bg-yellow-50 border border-yellow-100 rounded overflow-auto max-h-24">
+                <p>Selected Items Debug:</p>
+                <pre>{JSON.stringify(selectedItems, null, 2)}</pre>
               </div>
-              <div className="flex justify-between font-bold">
-                <span>Total</span>
-                <span>${(calculateTotal() * 1.1).toFixed(2)}</span>
+              
+              {/* Selected Items */}
+              <div className="mt-6">
+                <h3 className="text-lg font-medium mb-2">Selected Items</h3>
+                {selectedItems.length === 0 ? (
+                  <p className="text-gray-500 p-4 bg-gray-50 rounded text-center">No items selected</p>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {selectedItems.map((item, index) => (
+                      <li key={`${item.menuItemId}-${index}`} className="py-3">
+                        <div className="flex justify-between">
+                          <div>
+                            <p className="font-medium">{item.name || 'Unknown Item'}</p>
+                            <div className="flex items-center mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleQuantityChange(index, Math.max(1, item.quantity - 1))}
+                                className="p-1 bg-gray-200 text-gray-700 rounded-l-md"
+                              >
+                                -
+                              </button>
+                              <span className="px-3 py-1 bg-gray-100">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuantityChange(index, item.quantity + 1)}
+                                className="p-1 bg-gray-200 text-gray-700 rounded-r-md"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                placeholder="Special instructions"
+                                value={item.notes || ''}
+                                onChange={(e) => handleNotesChange(index, e.target.value)}
+                                className="w-full text-sm border-gray-300 rounded-md p-1"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <div>
+                              <p className="font-medium">${item.price.toFixed(2)}</p>
+                              <p className="text-sm text-gray-500">Total: ${(item.price * item.quantity).toFixed(2)}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(index)}
+                              className="mt-2 text-sm text-red-600 hover:text-red-800"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
-            </div>
-            
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={submitting || selectedItems.length === 0}
-              className="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {submitting ? 'Creating Order...' : 'Create Order'}
-            </button>
-          </form>
+              
+              {/* Order Totals */}
+              <div className="mt-6 border-t pt-4">
+                <div className="flex justify-between mb-2">
+                  <span>Subtotal</span>
+                  <span>${calculateSubtotal().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span>Tax (10%)</span>
+                  <span>${calculateTax().toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>Total</span>
+                  <span>${calculateTotal().toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <button
+                type="submit"
+                disabled={submitting || selectedItems.length === 0}
+                className="w-full px-4 py-2 mt-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {submitting ? 'Creating Order...' : 'Create Order'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

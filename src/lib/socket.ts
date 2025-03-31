@@ -33,6 +33,9 @@ export interface TableStatusEvent {
 
 // Keep a single socket instance
 let socket: Socket | null = null;
+let socketError: string | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 /**
  * Initialize a socket connection with authentication token
@@ -43,48 +46,98 @@ export function initializeSocket(token: string): Socket | null {
   try {
     // If we already have a socket instance and it's connected, return it
     if (socket && socket.connected) {
+      socketError = null;
       return socket;
     }
 
     // If we have a disconnected socket, try to reconnect it
     if (socket) {
-      socket.connect();
-      return socket;
+      try {
+        socket.connect();
+        socketError = null;
+        return socket;
+      } catch (reconnectError) {
+        console.error('Socket reconnection failed:', reconnectError);
+        // Continue to create a new socket
+      }
     }
 
     // Get the socket server URL from environment variables or use default
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
     
-    // Create a new socket instance
+    console.log(`Initializing socket connection to ${socketUrl}`);
+    
+    // Create a new socket instance with more resilient configuration
     socket = io(socketUrl, {
       auth: { token },
-      reconnectionAttempts: 5,
+      reconnectionAttempts: MAX_RECONNECT_ATTEMPTS,
       reconnectionDelay: 1000,
-      timeout: 5000,
-      transports: ['websocket', 'polling'],
+      timeout: 10000, // Increased timeout
+      transports: ['polling', 'websocket'], // Try polling first, then websocket
+      autoConnect: true,
+      forceNew: true, // Force a new connection
+    });
+
+    // Add connection event handlers
+    socket.on('connect', () => {
+      console.log('Socket connected successfully');
+      reconnectAttempts = 0;
+      socketError = null;
     });
 
     // Add error handling
     socket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-      toast.error(`Connection error: ${err.message}`);
+      reconnectAttempts++;
+      socketError = err.message;
+      console.error(`Socket connection error (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}):`, err.message);
+      
+      // Only show toast error on first attempt to avoid spam
+      if (reconnectAttempts === 1) {
+        toast.error(`Connection error: ${err.message}. Will retry...`);
+      }
       
       // If we've reached max reconnection attempts, set socket to null
-      if (socket && socket.io.reconnectionAttempts === 0) {
-        console.log('Max reconnection attempts reached, giving up');
-        socket.disconnect();
-        socket = null;
+      if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+        console.log('Max reconnection attempts reached, falling back to HTTP');
+        if (socket) {
+          socket.disconnect();
+          socket = null;
+        }
+        toast.error('Could not establish real-time connection. Using fallback mode.');
       }
     });
 
     socket.on('error', (err) => {
+      socketError = typeof err === 'string' ? err : 'Unknown socket error';
       console.error('Socket error:', err);
-      toast.error(`Socket error: ${err}`);
+      
+      if (typeof err === 'string') {
+        toast.error(`Socket error: ${err}`);
+      } else {
+        toast.error('An error occurred with the real-time connection');
+      }
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log(`Socket disconnected: ${reason}`);
+      
+      // If the server initiated the disconnect, attempt to reconnect
+      if (reason === 'io server disconnect') {
+        console.log('Server disconnected the socket, attempting to reconnect');
+        socket?.connect();
+      }
+      
+      // If client was forced to disconnect due to connection issues
+      if (reason === 'transport close' || reason === 'transport error') {
+        toast.error('Lost connection to server. Will try to reconnect...');
+      }
     });
 
     return socket;
   } catch (error) {
     console.error('Failed to initialize socket:', error);
+    socketError = error instanceof Error ? error.message : 'Unknown error initializing socket';
+    toast.error('Could not connect to real-time services');
     return null;
   }
 }
@@ -98,11 +151,22 @@ export function getSocket(): Socket | null {
 }
 
 /**
+ * Get the last socket error if any
+ * @returns Last socket error message or null
+ */
+export function getSocketError(): string | null {
+  return socketError;
+}
+
+/**
  * Disconnect the socket
  */
 export function disconnectSocket(): void {
   if (socket) {
     socket.disconnect();
+    socket = null;
+    socketError = null;
+    reconnectAttempts = 0;
   }
 }
 
@@ -166,7 +230,7 @@ export const unsubscribeFromTableUpdates = (): void => {
 
 // Send order status update
 export const sendOrderStatusUpdate = (orderId: string, status: string): void => {
-  if (!socket) {
+  if (!socket || !socket.connected) {
     // Fallback: Make a direct API call to update order status
     fetch(`/api/orders/${orderId}`, {
       method: 'PATCH',
@@ -180,7 +244,7 @@ export const sendOrderStatusUpdate = (orderId: string, status: string): void => 
 
 // Send table status update
 export const sendTableStatusUpdate = (tableId: string, status: string): void => {
-  if (!socket) {
+  if (!socket || !socket.connected) {
     // Fallback: Make a direct API call to update table status
     fetch(`/api/tables/${tableId}`, {
       method: 'PATCH',
@@ -195,6 +259,7 @@ export const sendTableStatusUpdate = (tableId: string, status: string): void => 
 export default {
   initializeSocket,
   getSocket,
+  getSocketError,
   disconnectSocket,
   subscribeToOrderUpdates,
   subscribeToKitchenTickets,

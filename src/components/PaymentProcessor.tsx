@@ -22,7 +22,7 @@ export default function PaymentProcessor({
 }: PaymentProcessorProps) {
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('CASH');
-  const [paymentReference, setPaymentReference] = useState('');
+  const [transactionId, setTransactionId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
   const [showQRCode, setShowQRCode] = useState(false);
@@ -64,8 +64,8 @@ export default function PaymentProcessor({
         orderId,
         amount,
         paymentMethod,
-        paymentStatus: 'COMPLETED',
-        paymentReference: paymentReference || undefined
+        status: 'COMPLETED',
+        transactionId: transactionId || undefined
       });
 
       // Handle success
@@ -266,13 +266,13 @@ export default function PaymentProcessor({
       {/* Reference Number */}
       <div className="mb-6">
         <label htmlFor="reference" className="block text-sm font-medium text-gray-700 mb-1">
-          Reference Number (Optional)
+          Transaction ID (Optional)
         </label>
         <input
           type="text"
           id="reference"
-          value={paymentReference}
-          onChange={(e) => setPaymentReference(e.target.value)}
+          value={transactionId}
+          onChange={(e) => setTransactionId(e.target.value)}
           placeholder="Transaction ID, Receipt Number, etc."
           className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         />

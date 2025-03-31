@@ -38,17 +38,38 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const branchId = searchParams.get('branchId');
+    const status = searchParams.get('status');
+
+    // Build where clause based on filters
+    const where: any = {};
+    if (branchId) {
+      where.branchId = branchId;
+    }
+    if (status) {
+      where.status = status;
+    }
+
+    console.log('Fetching tables with filters:', where);
 
     const tables = await db.table.findMany({
-      where: branchId ? { branchId } : {},
+      where,
       orderBy: { tableNumber: 'asc' },
     });
 
-    return NextResponse.json(tables);
+    console.log(`Found ${tables.length} tables`);
+
+    // Return in the format expected by the client
+    return NextResponse.json({
+      data: tables,
+      message: `Successfully fetched ${tables.length} tables`,
+    });
   } catch (error) {
     console.error('Error fetching tables:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch tables' },
+      { 
+        error: 'Failed to fetch tables',
+        details: error instanceof Error ? error.message : String(error)
+      },
       { status: 500 }
     );
   }

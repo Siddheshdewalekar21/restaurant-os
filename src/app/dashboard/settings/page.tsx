@@ -6,11 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'react-hot-toast';
 import api from '@/lib/api-client';
 import useSocket from '@/hooks/useSocket';
+import SocketDiagnostics from '@/components/SocketDiagnostics';
 
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { isConnected, reconnect } = useSocket();
   const [loading, setLoading] = useState(false);
+  const [showSocketDiagnostics, setShowSocketDiagnostics] = useState(false);
   const [userSettings, setUserSettings] = useState({
     notifications: true,
     darkMode: false,
@@ -51,6 +53,32 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
+
+      {/* Socket Diagnostics (collapsible) */}
+      <div className="bg-blue-50 border border-blue-200 p-4 rounded-md">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-medium text-blue-800">Real-Time Connection Status</h2>
+            <p className="text-sm text-blue-600">
+              {isConnected 
+                ? "✅ Connected to real-time updates" 
+                : "❌ Not connected to real-time updates"}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSocketDiagnostics(!showSocketDiagnostics)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            {showSocketDiagnostics ? 'Hide Diagnostics' : 'Show Diagnostics'}
+          </button>
+        </div>
+        
+        {showSocketDiagnostics && (
+          <div className="mt-4">
+            <SocketDiagnostics />
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
